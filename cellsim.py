@@ -3,89 +3,92 @@ import sys
 import numpy as np
 import scipy.spatial as spatial
 import random
+import math
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-init = {
-    'n_robots': 1000,
-    'rounds': None,
-    'radius': 0.05,
-    'states': {
-        0: 0.6,
-        1: 0.25,
-        2: 0.15
-    },
-    'mutation': 0.05
-}
+class States:
+    RED = 0
+    BLUE = 1
+    GREEN = 2
 
-colors = {
-    0: 'red',
-    1: 'blue', 
-    2: 'green'
-}
-
-def get_new_state(state, neighbor_states):
-    if random.random() < init['mutation']:
-        return 2
-    if state == 0:
-        if neighbor_states.size < 2:
-            return 1
-        if neighbor_states[0] > 0.2:
-            return 0
-        if neighbor_states[1] > 0.7:
-            return 1 
-        return 0
-    elif state == 1:
-        if neighbor_states.size < 2:
-            return 1
-        if neighbor_states[0] > 0.2:
-            return 0
-        return 1
-    elif state == 2:
-        if (neighbor_states.size < 3 or neighbor_states[1] > 0.5):
-            return 1
-        return 2 
-
-if __name__ == '__main__':
-    size = init['n_robots']
-    radius = init['radius']
-
-    probs = [init['states'][state] for state in sorted(init['states'].keys())]
-    states = np.random.choice([0, 1, 2], size=size, p=probs)
-
-    points = np.random.random((size, 2))
-    point_tree = spatial.cKDTree(points)
-
-    fig, ax = plt.subplots()
-
-    x, y = zip(*points)
-    g_points = []
-    for (i,) in np.ndindex(points.shape[:1]):
-        x = points[i][0]
-        y = points[i][1]
-        plot, = ax.plot(x, y, 'o', c=colors[states[i]])
-        g_points.append(plot)
-    
-    def animate(i):
-        global points, point_tree     
-        for (i,) in np.ndindex(points.shape[:1]):
-            x = points[i][0]
-            y = points[i][1]
-            _, neighbor_states = np.unique([states[j] for j in point_tree.query_ball_point([x, y], radius)], return_counts=True)
-
-            if neighbor_states.size > 0:
-                neighbor_states = np.divide(neighbor_states, sum(neighbor_states))
-
-            states[i] = get_new_state(states[i], neighbor_states)
-            g_points[i].set_color(colors[states[i]])
-
-            direction = np.multiply(np.random.random(2) - 0.5, radius)
-            points[i] = np.add(points[i], direction)
-        point_tree = spatial.cKDTree(points)
-
-    ax.axis([-0.2,1.2,-0.2,1.2])
-    ani = animation.FuncAnimation(fig, animate, interval=100)
-    plt.show()
+class System:
+    def __init__(self, size, radius, red_freq, blue_freq, green_freq, mutation_prob, get_new_state): 
+        self.state_freq = {
+            States.RED: red_freq,
+            States.BLUE: blue_freq,
+            States.GREEN: green_freq,
+        }
         
-        
+        self.state_colors = {
+            States.RED: 'red',
+            States.BLUE: 'blue',
+            States.GREEN: 'green',
+        }
+
+        self.size = size
+        self.radius = radius
+        self.mutation_prob = mutation_prob
+
+        self.get_new_state = get_new_state
+        self.n_states = len(self.state_freq.keys())
+        probs = [self.state_freq[state] for state in sorted(self.state_freq.keys())]
+        self.states = np.random.choice([States.RED, States.BLUE, States.GREEN], size=self.size, p=probs)
+
+        self.points = np.random.random((self.size, 2))
+        self.point_tree = spatial.cKDTree(self.points)
+
+        self.fig, ax = plt.subplots()
+
+        x, y = zip(*self.points)
+        self.g_points = []
+        for (i,) in np.ndindex(self.points.shape[:1]):
+            x = self.points[i][0]
+            y = self.points[i][1]
+            plot, = ax.plot(x, y, 'o', c=self.state_colors[self.states[i]])
+            self.g_points.append(plot)
+
+        ax.axis([-0.2,1.2,-0.2,1.2])
+
+    def state_machine(self, state, neighbor_states):
+        if random.random() < self.mutation_prob:
+            return 2
+
+        new_state = self.get_new_state(state, *neighbor_states)
+
+        if new_state is None:
+            raise Exception('Invalid state')
+
+        return new_state
+
+    def start(self):
+        ani = animation.FuncAnimation(self.fig, self.animate, interval=100)
+        plt.show()
+
+    def animate(self, i):
+        new_states = np.zeros(self.size, dtype=int)
+        for (i,) in np.ndindex(self.points.shape[:1]):
+            state_counts = np.zeros(self.n_states) 
+            x = self.points[i][0]
+            y = self.points[i][1]
+            for j in self.point_tree.query_ball_point([x, y], self.radius):
+                state_counts[self.states[j]] += 1
+
+            if self.states[i] == States.GREEN:
+                direction = np.multiply(np.random.random(2) - 0.5, self.radius)
+                self.points[i] = np.add(self.points[i], direction)
+                self.g_points[i].set_data(self.points[i][0], self.points[i][1])
+
+            # Uncomment for asynchrnous (kind of)
+            self.states[i] = self.state_machine(self.states[i], state_counts)
+            self.g_points[i].set_color(self.state_colors[self.states[i]])
+
+        # # Uncomment for synchronous
+        #     new_states[i] = self.state_machine(self.states[i], state_counts) 
+        # self.states = new_states 
+        # for i in range(self.size):
+        #     self.g_points[i].set_color(self.state_colors[self.states[i]])
+
+        self.point_tree = spatial.cKDTree(self.points)
+
