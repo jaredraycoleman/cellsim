@@ -52,10 +52,10 @@ class System:
         ax.axis([-0.2,1.2,-0.2,1.2])
 
     def state_machine(self, state, neighbor_states):
-        if random.random() < self.mutation_prob:
-            return 2
+        #if random.random() < self.mutation_prob:
+        #    return 2
 
-        new_state = self.get_new_state(state, *neighbor_states)
+        new_state = self.get_new_state(state, self.mutation_prob, *neighbor_states)
 
         if new_state is None:
             raise Exception('Invalid state')
