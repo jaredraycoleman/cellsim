@@ -4,3 +4,4 @@
 **/miniconda3
 **/Miniconda3*.exe
 **/Miniconda3*.sh
+**/*.pyc
