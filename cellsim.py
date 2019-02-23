@@ -10,21 +10,28 @@ import matplotlib.animation as animation
 
 class States:
     RED = 0
-    BLUE = 1
-    GREEN = 2
+    GREEN = 1
+    BLUE = 2
+    YELLOW = 3
 
 class System:
-    def __init__(self, size, radius, red_freq, blue_freq, green_freq, mutation_prob, get_new_state): 
+    def __init__(self, size, radius, mutation_prob, get_new_state, 
+                 red_freq = 0.5,
+                 blue_freq = 0.5, 
+                 green_freq=0.0, 
+                 yellow_freq=0.0): 
         self.state_freq = {
             States.RED: red_freq,
             States.BLUE: blue_freq,
             States.GREEN: green_freq,
+            States.YELLOW: yellow_freq,
         }
         
         self.state_colors = {
             States.RED: 'red',
             States.BLUE: 'blue',
             States.GREEN: 'green',
+            States.YELLOW: 'yellow',
         }
 
         self.size = size
@@ -34,7 +41,7 @@ class System:
         self.get_new_state = get_new_state
         self.n_states = len(self.state_freq.keys())
         probs = [self.state_freq[state] for state in sorted(self.state_freq.keys())]
-        self.states = np.random.choice([States.RED, States.BLUE, States.GREEN], size=self.size, p=probs)
+        self.states = np.random.choice([States.RED, States.GREEN, States.BLUE, States.YELLOW], size=self.size, p=probs)
 
         self.points = np.random.random((self.size, 2))
         self.point_tree = spatial.cKDTree(self.points)
@@ -75,7 +82,7 @@ class System:
             for j in self.point_tree.query_ball_point([x, y], self.radius):
                 state_counts[self.states[j]] += 1
 
-            if self.states[i] == States.GREEN:
+            if self.states[i] % 2 != 0:
                 direction = np.multiply(np.random.random(2) - 0.5, self.radius)
                 self.points[i] = np.add(self.points[i], direction)
                 self.g_points[i].set_data(self.points[i][0], self.points[i][1])
